@@ -34,11 +34,12 @@ const initialization = async () => {
 initialization();
 
 const checkInvalidQuery = async (request, response, next) => {
+  const { todoId } = request.params;
   const { priority, status, category, search_q, date } = request.query;
   if (category !== undefined) {
     const categoryArray = ["WORK", "HOME", "LEARNING"];
-
-    if (categoryArray.includes(category)) {
+    const categoryInArray = categoryArray.includes(category);
+    if (categoryInArray === true) {
       request.category = category;
     } else {
       response.status(400);
@@ -49,7 +50,8 @@ const checkInvalidQuery = async (request, response, next) => {
 
   if (priority !== undefined) {
     const priorityArray = ["HIGH", "MEDIUM", "LOW"];
-    if (priorityArray.includes(priority)) {
+    const priorityInArray = priorityArray.includes(priority);
+    if (priorityInArray === true) {
       request.priority = priority;
       console.log(request.priority);
     } else {
@@ -61,7 +63,8 @@ const checkInvalidQuery = async (request, response, next) => {
 
   if (status !== undefined) {
     const statusArray = ["TO DO", "IN PROGRESS", "DONE"];
-    if (statusArray.includes(status)) {
+    const statusInArray = statusArray.includes(status);
+    if (statusInArray === true) {
       request.status = status;
     } else {
       response.status(400);
@@ -73,8 +76,7 @@ const checkInvalidQuery = async (request, response, next) => {
   if (date !== undefined) {
     try {
       const newDate = new Date(date);
-      console.log(typeof newDate);
-      const formatDate = format(newDate, "yyyy-MM-dd");
+      const formatDate = format(new Date(newDate), "yyyy-MM-dd");
       const finalDate = toDate(
         new Date(
           `${newDate.getFullYear()}-${
@@ -92,19 +94,19 @@ const checkInvalidQuery = async (request, response, next) => {
       return;
     }
   }
-  if (search_q !== undefined) {
-    request.search_q = search_q;
-  }
+  request.id = todoId;
+  request.search_q = search_q;
+
   next();
 };
 
 const checkInvalidBody = async (request, response, next) => {
   const { id, todo, category, priority, status, date } = request.body;
-  request.id = id;
-  request.todo = todo;
+  const { todoId } = request.params;
   if (category !== undefined) {
-    categoryArray = ["WORK", "HOME", "LEARNING"];
-    if (categoryArray.includes(category)) {
+    const categoryArray = ["WORK", "HOME", "LEARNING"];
+    const categoryInArray = categoryArray.includes(category);
+    if (categoryInArray === true) {
       request.category = category;
     } else {
       response.status(400);
@@ -115,7 +117,8 @@ const checkInvalidBody = async (request, response, next) => {
 
   if (priority !== undefined) {
     const priorityArray = ["HIGH", "MEDIUM", "LOW"];
-    if (priorityArray.includes(priority)) {
+    const priorityInArray = priorityArray.includes(priority);
+    if (priorityInArray === true) {
       request.priority = priority;
       console.log(request.priority);
     } else {
@@ -127,7 +130,8 @@ const checkInvalidBody = async (request, response, next) => {
 
   if (status !== undefined) {
     const statusArray = ["TO DO", "IN PROGRESS", "DONE"];
-    if (statusArray.includes(status)) {
+    const statusInArray = statusArray.includes(status);
+    if (statusInArray === true) {
       request.status = status;
     } else {
       response.status(400);
@@ -152,7 +156,9 @@ const checkInvalidBody = async (request, response, next) => {
       return;
     }
   }
-
+  request.id = id;
+  request.todoId = todoId;
+  request.todo = todo;
   next();
 };
 
@@ -160,9 +166,9 @@ function convertFormatOfRows(eachItem) {
   return {
     id: eachItem.id,
     todo: eachItem.todo,
-    category: eachItem.category,
     priority: eachItem.priority,
     status: eachItem.status,
+    category: eachItem.category,
     dueDate: eachItem.due_date,
   };
 }
@@ -190,11 +196,20 @@ app.get("/todos/", checkInvalidQuery, async (request, response) => {
 });
 
 //API2
-app.get("/todos/:todoId/", async (request, response) => {
-  const { todoId } = request.params;
-  const selectRowQuery = `SELECT * FROM todo WHERE id = ${todoId};`;
+app.get("/todos/:todoId/", checkInvalidQuery, async (request, response) => {
+  const { todoId } = request;
+  const selectRowQuery = `
+        SELECT 
+            id,
+            todo,
+            priority,
+            status,
+            category,
+            due_date AS dueDate 
+        FROM 
+            todo WHERE id = ${todoId};`;
   const resultObj = await dataBase.get(selectRowQuery);
-  response.send(convertFormatOfRows(resultObj));
+  response.send(resultObj);
 });
 
 app.get("/agenda/", checkInvalidQuery, async (request, response) => {
@@ -216,13 +231,13 @@ app.post("/todos/", checkInvalidBody, async (request, response) => {
   const { id, todo, category, priority, status, date } = request;
 
   const selectRowQuery = `
-  INSERT INTO todo (id, todo, category, priority, status, due_date)
+  INSERT INTO todo (id, todo, priority, status, category, due_date))
   VALUES (
       ${id},
       '${todo}',
-      '${category}' 
-      '${priority}', 
+      '${priority}' 
       '${status}', 
+      '${category}', 
       ${date}
        );`;
   const resultObj = await dataBase.run(selectRowQuery);
@@ -230,9 +245,9 @@ app.post("/todos/", checkInvalidBody, async (request, response) => {
 });
 
 app.put("/todos/:todoId/", checkInvalidBody, async (request, response) => {
-  let selectRowQuery;
-  const { todoId } = request.params;
-  const { id, todo, category = "", priority = "", status = "", date } = request;
+  let selectRowQuery =;
+  const { todoId } = request;
+  const { id, todo, category, priority, status, date } = request;
   switch (true) {
     case status !== undefined:
       selectRowQuery = `UPDATE todo SET status = '${status}' WHERE id = ${todoId};`;
@@ -240,12 +255,12 @@ app.put("/todos/:todoId/", checkInvalidBody, async (request, response) => {
       response.send("Status Updated");
       break;
     case priority !== undefined:
-      selectRowQuery = `UPDATE todo SET priority = '${priority}' WHERE id = ${priority};`;
+      selectRowQuery = `UPDATE todo SET priority = '${priority}' WHERE id = ${todoId};`;
       await dataBase.run(selectRowQuery);
       response.send("Priority Updated");
       break;
     case category !== undefined:
-      selectRowQuery = `UPDATE todo SET category = '${category}' WHERE id = ${category};`;
+      selectRowQuery = `UPDATE todo SET category = '${category}' WHERE id = ${todoId};`;
       await dataBase.run(selectRowQuery);
       response.send("Category Updated");
       break;
@@ -254,7 +269,7 @@ app.put("/todos/:todoId/", checkInvalidBody, async (request, response) => {
       await dataBase.run(selectRowQuery);
       response.send("Todo Updated");
       break;
-    default:
+    case date !== undefined:
       selectRowQuery = `UPDATE todo SET due_date = '${date}' WHERE id = ${todoId};`;
       await dataBase.run(selectRowQuery);
       response.send("Due Date Updated");
