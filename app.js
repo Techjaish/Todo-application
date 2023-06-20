@@ -1,15 +1,18 @@
 const express = require("express");
+const app = express();
+app.use(express.json());
+
 const { open } = require("sqlite");
 const sqlite3 = require("sqlite3");
+
 const format = require("date-fns/format");
 const isValid = require("date-fns/isValid");
 const toDate = require("date-fns/toDate");
+
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const Path = require("path");
-const app = express();
 
-app.use(express.json());
 const dbPath = Path.join(__dirname, "todoApplication.db");
 let dataBase = null;
 
@@ -33,7 +36,8 @@ initialization();
 const checkInvalidQuery = async (request, response, next) => {
   const { priority, status, category, search_q, date } = request.query;
   if (category !== undefined) {
-    categoryArray = ["WORK", "HOME", "LEARNING"];
+    const categoryArray = ["WORK", "HOME", "LEARNING"];
+
     if (categoryArray.includes(category)) {
       request.category = category;
     } else {
@@ -44,7 +48,7 @@ const checkInvalidQuery = async (request, response, next) => {
   }
 
   if (priority !== undefined) {
-    priorityArray = ["HIGH", "MEDIUM", "LOW"];
+    const priorityArray = ["HIGH", "MEDIUM", "LOW"];
     if (priorityArray.includes(priority)) {
       request.priority = priority;
       console.log(request.priority);
@@ -56,7 +60,7 @@ const checkInvalidQuery = async (request, response, next) => {
   }
 
   if (status !== undefined) {
-    statusArray = ["TO DO", "IN PROGRESS", "DONE"];
+    const statusArray = ["TO DO", "IN PROGRESS", "DONE"];
     if (statusArray.includes(status)) {
       request.status = status;
     } else {
@@ -110,7 +114,7 @@ const checkInvalidBody = async (request, response, next) => {
   }
 
   if (priority !== undefined) {
-    priorityArray = ["HIGH", "MEDIUM", "LOW"];
+    const priorityArray = ["HIGH", "MEDIUM", "LOW"];
     if (priorityArray.includes(priority)) {
       request.priority = priority;
       console.log(request.priority);
@@ -122,7 +126,7 @@ const checkInvalidBody = async (request, response, next) => {
   }
 
   if (status !== undefined) {
-    statusArray = ["TO DO", "IN PROGRESS", "DONE"];
+    const statusArray = ["TO DO", "IN PROGRESS", "DONE"];
     if (statusArray.includes(status)) {
       request.status = status;
     } else {
@@ -165,19 +169,24 @@ function convertFormatOfRows(eachItem) {
 //APKI1
 app.get("/todos/", checkInvalidQuery, async (request, response) => {
   const { status = "", search_q = "", priority = "", category = "" } = request;
+  console.log(status);
 
   const selectQuery = `
-    SELECT 
-    * 
-    FROM 
-    todo 
-    WHERE 
-    todo LIKE '%${searchq}%'
-    AND category LIKE '%${category}%'
-    AND priority LIKE '%${newObj.priority}%' 
-    AND status LIKE '%${status}%'`;
+    
+        SELECT 
+            id,
+            todo,
+            priority,
+            status,
+            category,
+            due_date AS dueDate 
+        FROM 
+            todo
+        WHERE 
+        todo LIKE '%${search_q}%' AND priority LIKE '%${priority}%' 
+        AND status LIKE '%${status}%' AND category LIKE '%${category}%';`;
   const resultArray = await dataBase.all(selectQuery);
-  response.send(resultArray.map((eachItem) => convertFormatOfRows(eachItem)));
+  response.send(resultArray);
 });
 
 //API2
@@ -190,21 +199,21 @@ app.get("/todos/:todoId/", async (request, response) => {
 
 app.get("/agenda/", checkInvalidQuery, async (request, response) => {
   const { date } = request;
-  selectQuery = `SELECT * FROM todo WHERE due_date = ${date}`;
+  selectQuery = `
+  SELECT
+  id,
+  todo,
+  priority,
+  status,
+  category,
+  due_date AS dueDate 
+  FROM todo WHERE due_date = ${date}`;
   const resultArray = await dataBase.all(selectQuery);
-  response.send(resultArray.map((eachItem) => convertFormatOfRows(eachItem)));
+  response.send(resultArray);
 });
 
 app.post("/todos/", checkInvalidBody, async (request, response) => {
-  const {
-    id,
-    todo,
-    status = "",
-    category = "",
-    priority = "",
-    status = "",
-    date,
-  } = request;
+  const { id, todo, category, priority, status, date } = request;
 
   const selectRowQuery = `
   INSERT INTO todo (id, todo, category, priority, status, due_date)
@@ -216,39 +225,31 @@ app.post("/todos/", checkInvalidBody, async (request, response) => {
       '${status}', 
       ${date}
        );`;
-  const resultObj = await dataBase.get(selectRowQuery);
+  const resultObj = await dataBase.run(selectRowQuery);
   response.send("Todo Successfully Added");
 });
 
 app.put("/todos/:todoId/", checkInvalidBody, async (request, response) => {
   let selectRowQuery;
   const { todoId } = request.params;
-  const {
-    id,
-    todo,
-    status = "",
-    category = "",
-    priority = "",
-    status = "",
-    date,
-  } = request;
+  const { id, todo, category = "", priority = "", status = "", date } = request;
   switch (true) {
-    case newObj.status !== "":
+    case status !== undefined:
       selectRowQuery = `UPDATE todo SET status = '${status}' WHERE id = ${todoId};`;
       await dataBase.run(selectRowQuery);
       response.send("Status Updated");
       break;
-    case newObj.priority !== "":
+    case priority !== undefined:
       selectRowQuery = `UPDATE todo SET priority = '${priority}' WHERE id = ${priority};`;
       await dataBase.run(selectRowQuery);
       response.send("Priority Updated");
       break;
-    case newObj.category !== "":
+    case category !== undefined:
       selectRowQuery = `UPDATE todo SET category = '${category}' WHERE id = ${category};`;
       await dataBase.run(selectRowQuery);
       response.send("Category Updated");
       break;
-    case newObj.todo !== "":
+    case todo !== undefined:
       selectRowQuery = `UPDATE todo SET todo = '${todo}' WHERE id = ${todoId};`;
       await dataBase.run(selectRowQuery);
       response.send("Todo Updated");
